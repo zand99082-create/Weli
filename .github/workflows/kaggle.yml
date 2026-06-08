@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       dataset:
-        description: 'آدرس دیتاست Kaggle'
+        description: 'آدرس دیتاست Kaggle (مثال: salikhussaini49/Boxing-pose-dataset)'
         required: true
         default: 'salikhussaini49/Boxing-pose-dataset'
         type: string
       output_folder:
-        description: 'نام پوشه خروجی'
+        description: 'نام پوشه خروجی در ریپازیتوری'
         required: true
         default: 'kaggle_downloads'
         type: string
@@ -18,7 +18,7 @@ jobs:
   download:
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 بررسی کد
+      - name: 📥 بررسی کد (Checkout)
         uses: actions/checkout@v4
 
       - name: 🐍 نصب پایتون
@@ -26,9 +26,9 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 📦 نصب کتابخانه‌ها
+      - name: 📦 نصب kaggle (فقط)
         run: |
-          pip install kagglehub kaggle
+          pip install kaggle
 
       - name: 🔑 تنظیم Kaggle (روش قدیمی)
         run: |
@@ -37,40 +37,24 @@ jobs:
           chmod 600 ~/.kaggle/kaggle.json
           echo "✅ تنظیمات Kaggle انجام شد."
 
-      - name: 📥 دانلود دیتاست
+      - name: 📥 دانلود دیتاست با kaggle CLI
         run: |
-          python -c "
-          import os
-          import shutil
-          import kagglehub
+          DATASET="${{ github.event.inputs.dataset }}"
+          OUTPUT_DIR="${{ github.event.inputs.output_folder }}"
           
-          dataset_path = '${{ github.event.inputs.dataset }}'
-          output_dir = '${{ github.event.inputs.output_folder }}'
+          echo "⏳ شروع دانلود از $DATASET..."
           
-          print(f'⏳ شروع دانلود از {dataset_path}...')
+          # دانلود با kaggle CLI
+          kaggle datasets download "$DATASET" --unzip -p "./$OUTPUT_DIR"
           
-          try:
-              download_path = kagglehub.dataset_download(dataset_path)
-              print(f'✅ دانلود کامل شد: {download_path}')
-              
-              if os.path.exists(output_dir):
-                  shutil.rmtree(output_dir)
-              
-              shutil.copytree(download_path, output_dir)
-              print(f'📁 فایل‌ها به {output_dir} کپی شدند.')
-              
-              files = os.listdir(output_dir)
-              print(f'📄 فایل‌ها: {files}')
-              
-          except Exception as e:
-              print(f'❌ خطا: {e}')
-              exit(1)
-          "
+          echo "✅ دانلود کامل شد."
+          echo "📄 فایل‌های دانلود شده:"
+          ls -la "./$OUTPUT_DIR"
 
-      - name: 📤 کامیت به ریپازیتوری
+      - name: 📤 کامیت فایل‌ها به ریپازیتوری
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add ${{ github.event.inputs.output_folder }}
-          git diff --quiet && git diff --staged --quiet || git commit -m "📦 اضافه شدن دیتاست: ${{ github.event.inputs.dataset }}"
+          git diff --quiet && git diff --staged --quiet || git commit -m "📦 اضافه شدن دیتاست از Kaggle: ${{ github.event.inputs.dataset }}"
           git push
