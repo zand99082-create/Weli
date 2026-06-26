@@ -1,0 +1,69 @@
+name: Download Full Website (Ultra Fast)
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: 'آدرس کامل سایت (مثلا https://example.com)'
+        required: true
+        type: string
+      max_parallel:
+        description: 'تعداد دانلود همزمان (پیشنهاد ۱۰ تا ۲۰)'
+        required: false
+        default: '20'
+        type: string
+
+jobs:
+  ultra_fast_download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60  # حداکثر زمان اجرا (۱ ساعت)
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install wget and parallel
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget parallel
+
+    - name: Create output directory
+      run: mkdir -p downloaded_site
+
+    - name: Get sitemap or crawl URLs (First phase)
+      id: get_urls
+      run: |
+        echo "🔍 Gathering all URLs from the site..."
+        wget --spider --force-html -r -l 10 -np -nd -nv -o urls.log "${{ github.event.inputs.site_url }}"
+        # استخراج تمام لینک‌های پیدا شده
+        grep -oP '(?<=^--)\S+' urls.log | sort -u > all_urls.txt
+        echo "✅ Total URLs found: $(wc -l < all_urls.txt)"
+
+    - name: Download all files in parallel (Second phase)
+      run: |
+        echo "⚡ Starting parallel download with ${{ github.event.inputs.max_parallel }} threads..."
+        cat all_urls.txt | parallel -j ${{ github.event.inputs.max_parallel }} --bar \
+          wget \
+            --no-check-certificate \
+            --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            --directory-prefix=downloaded_site \
+            --force-directories \
+            -nv \
+            {}
+
+    - name: Fix links for offline viewing
+      run: |
+        echo "🔧 Converting links to local paths..."
+        wget -k -r -l 1 -np -nv -nH --cut-dirs=1 "${{ github.event.inputs.site_url }}"
+
+    - name: Compress downloaded site
+      run: |
+        echo "📦 Compressing the downloaded site..."
+        tar -czf downloaded_site.tar.gz downloaded_site/
+
+    - name: Upload compressed site as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: downloaded-site-fast
+        path: downloaded_site.tar.gz
+        retention-days: 7
