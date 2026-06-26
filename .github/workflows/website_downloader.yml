@@ -1,7 +1,7 @@
 name: Download Full Website
 
 on:
-  workflow_dispatch:  # اجازه اجرای دستی
+  workflow_dispatch:
     inputs:
       site_url:
         description: 'آدرس کامل سایت (مثلا https://example.com)'
@@ -30,8 +30,6 @@ jobs:
           --adjust-extension \
           --convert-links \
           --no-parent \
-          --wait=1 \
-          --limit-rate=100k \
           --directory-prefix=downloaded_site \
           ${{ github.event.inputs.site_url }}
 
